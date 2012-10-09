@@ -77,13 +77,25 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
                 $server['dbindex'] = self::DEFAULT_DBINDEX;
             }
             if ($server['persistent']) {
-                $this->_redis->pconnect($server['host'], $server['port']);
+                $result = $this->_redis->pconnect($server['host'], $server['port']);
             } else {
-                $this->_redis->connect($server['host'], $server['port']);
+                $result = $this->_redis->connect($server['host'], $server['port']);
             }
 
-            $this->_redis->select($server['dbindex']);
+            if ($result)
+                $this->_redis->select($server['dbindex']);
+            else
+                $this->_redis = null;
         }
+    }
+
+    /**
+     * Returns status on if cache backend is connected to Redis
+     * @return bool true if cache backend is connected to Redis server.
+    public function isConnected()
+    {
+        if ($this->_redis)
+        return false;
     }
 
 
