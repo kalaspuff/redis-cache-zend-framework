@@ -144,6 +144,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     public function save($data, $id, $tags = array(), $specificLifetime = false)
     {
+        if (!$this->_redis)
+            return false;
+
         $lifetime = $this->getLifetime($specificLifetime);
 
         $redis = $this->_redis->multi();
@@ -221,6 +224,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     public function remove($id)
     {
+        if (!$this->_redis)
+            return false;
+
         if (!$id)
             return false;
         if (is_string($id))
@@ -245,6 +251,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     public function removeTag($tag)
     {
+        if (!$this->_redis)
+            return false;
+
         if (!$tag)
             return false;
         if (is_string($tag))
@@ -305,6 +314,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     protected function _clean($mode = Zend_Cache::CLEANING_MODE_ALL, $tags = array())
     {
+        if (!$this->_redis)
+            return false;
+
         $result = true;
         $all = array();
 
@@ -338,6 +350,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     protected function _test($id, $doNotTestCacheValidity)
     {
+        if (!$this->_redis)
+            return false;
+
         if ($doNotTestCacheValidity) {
             return true;
         }
@@ -360,6 +375,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     protected function _load($id)
     {
+        if (!$this->_redis)
+            return false;
+
         return $this->_redis->get($this->_keyFromId($id));
     }
 
@@ -394,6 +412,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     public function getIdsMatchingTags($tags = array())
     {
+        if (!$this->_redis)
+            return array();
+
         if (!$tags)
             return array();
         if ($tags && is_string($tags))
@@ -432,6 +453,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     public function getIdsMatchingAnyTags($tags = array())
     {
+        if (!$this->_redis)
+            return array();
+
         if (!$tags)
             return array();
         if ($tags && is_string($tags))
@@ -476,6 +500,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      */
     public function touch($id, $extraLifetime)
     {
+        if (!$this->_redis)
+            return false;
+
         $data = $this->load($id);
         if ($data === false)
             return false;
