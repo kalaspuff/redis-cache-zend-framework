@@ -222,7 +222,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      * @param  string $id cache id
      * @return boolean true if no problem
      */
-    public function remove($id)
+    public function remove($id, $hardReset = false)
     {
         if (!$this->_redis)
             return false;
@@ -236,6 +236,8 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         $deleteIds = array();
         foreach ($id as $i) {
             $deleteIds[] = $this->_keyFromItemTags($i);
+            if ($hardReset)
+                $deleteIds[] = $this->_keyFromId($i);
         }
         $this->_redis->delete($deleteIds);
 
