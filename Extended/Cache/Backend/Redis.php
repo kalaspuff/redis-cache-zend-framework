@@ -138,7 +138,8 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      *
      * @param  string $data             Datas to cache
      * @param  string $id               Cache id
-     * @param  array  $tags             Array of strings, the cache record will be tagged by each string entry
+     * @param  mixed  $tags             Array of strings, the cache record will be tagged by each string entry, if false, key
+     *                                  can only be read if $doNotTestCacheValidity is true
      * @param  int    $specificLifetime If != false, set a specific lifetime for this cache record (null => infinite lifetime)
      * @return boolean true if no problem
      */
@@ -149,24 +150,36 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
 
         $lifetime = $this->getLifetime($specificLifetime);
 
+        if (!$tags || !count($tags))
+            $tags = array('');
+        if (is_string($tags))
+            $tags = array($tags);
+
+        if (!count($tags)) {
+            $this->_redis->delete($this->_keyFromItemTags($id));
+            if ($lifetime === null) {
+                $return = $this->_redis->set($this->_keyFromId($id), $data);
+            } else {
+                $return = $this->_redis->setex($this->_keyFromId($id), $lifetime, $data);
+            }
+            $this->_redis->sAdd($this->_keyFromItemTags($id), '');
+            return $return;
+        }
+
         $redis = $this->_redis->multi();
+        $redis = $redis->delete($this->_keyFromItemTags($id));
         if ($lifetime === null) {
             $redis = $redis->set($this->_keyFromId($id), $data);
         } else {
             $redis = $redis->setex($this->_keyFromId($id), $lifetime, $data);
         }
 
-        if (!$tags || !count($tags))
-            $tags = array('');
-        if (is_string($tags))
-            $tags = array($tags);
         $itemTags = array($this->_keyFromItemTags($id));
         foreach ($tags as $tag) {
             $itemTags[] = $tag;
             if ($tag)
                 $redis = $redis->sAdd($this->_keyFromTag($tag), $id);
         }
-        $redis = $redis->delete($this->_keyFromItemTags($id));
         if (count($itemTags) > 1)
             $redis = call_user_func_array(array($redis, 'sAdd'), $itemTags);
 
@@ -181,6 +194,32 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
                 return false;
         }
         return true;
+    }
+
+    /**
+     * Save some string datas into a cache record. Only the specific key will be stored and no tags.
+     * Can only be read by load() if $doNotTestCacheValidity is true
+     *
+     * Note : $data is always "string" (serialization is done by the
+     * core not by the backend)
+     *
+     * @param  string $data             Datas to cache
+     * @param  string $id               Cache id
+     * @param  int    $specificLifetime If != false, set a specific lifetime for this cache record (null => infinite lifetime)
+     * @return boolean true if no problem
+     */
+    protected function _storeKey($data, $id, $specificLifetime = false)
+    {
+        if (!$this->_redis)
+            return false;
+
+        $lifetime = $this->getLifetime($specificLifetime);
+
+        if ($lifetime === null) {
+            return $this->_redis->set($this->_keyFromId($id), $data);
+        } else {
+            return $this->_redis->setex($this->_keyFromId($id), $lifetime, $data);
+        }
     }
 
     /**
@@ -273,6 +312,87 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
     }
 
     /**
+     * Returns wether a specific member key exists in the Redis set
+     *
+     * @param string $member
+     * @param string $set
+     * @return bool true or false
+     */
+    public function existsInSet($member, $set)
+    {
+        if (!$this->_redis)
+            return null;
+
+        if (!$this->_redis->sIsMember($this->_keyFromId($set), $member))
+            return false;
+        return true;
+    }
+
+    /**
+     * Adds a key to a set
+     *
+     * @param mixed $member key(s) to add
+     * @param string $set
+     * @param string $specificLifetime lifetime, null for persistant
+     * @return bool result of the add
+     */
+    public function addToSet($member, $set, $specificLifetime = false)
+    {
+        if (!$this->_redis)
+            return null;
+
+        $lifetime = $this->getLifetime($specificLifetime);
+
+        if (is_array($member)) {
+            $redis = $this->_redis;
+            $return = call_user_func_array(array($redis, 'sAdd'), array_merge(array($this->_keyFromId($set)), $member));
+        } else {
+            $return = $this->_redis->sAdd($this->_keyFromId($set), $member);
+        }
+        if ($lifetime !== null)
+            $this->_redis->setTimeout($this->_keyFromId($set), $lifetime);
+
+        return $return;
+    }
+
+    /**
+     * Removes a key from a redis set.
+     *
+     * @param mixed $member key(s) to remove
+     * @param string $set
+     * @return bool result of removal
+     */
+    public function removeFromSet($member, $set)
+    {
+        if (!$this->_redis)
+            return null;
+
+        if (is_array($member)) {
+            if (!count($member))
+                return true;
+            $redis = $this->_redis;
+            $return = call_user_func_array(array($redis, 'sRem'), array_merge(array($this->_keyFromId($set)), $member));
+        } else {
+            $return = $this->_redis->sRem($this->_keyFromId($set), $member);
+        }
+        return $return;
+    }
+
+    /**
+     * Returns all keys in a Redis set
+     *
+     * @param string $set
+     * @return array member keys of set
+     */
+    public function membersInSet($set)
+    {
+        if (!$this->_redis)
+            return null;
+
+        return $this->_redis->sMembers($this->_keyFromId($set));
+    }
+
+    /**
      * Clean some cache records
      *
      * Available modes are :
@@ -323,7 +443,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         $all = array();
 
         if ($mode == Zend_Cache::CLEANING_MODE_ALL)
-            return $this->_redis->flushAll();
+            return $this->_redis->flushDb();
 
         if ($mode == Zend_Cache::CLEANING_MODE_OLD)
             return true; /* Redis takes care of expire */
@@ -505,11 +625,39 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         if (!$this->_redis)
             return false;
 
+        $lifetime = $this->getLifetime($extraLifetime);
+        $return = false;
+        if ($lifetime !== null) {
+            $this->_redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
+            $return = $this->_redis->setTimeout($this->_keyFromId($id), $lifetime);
+        }
+        return $return;
+/*
+
         $data = $this->load($id);
         if ($data === false)
             return false;
         $tags = $this->_redis->sMembers($this->_keyFromItemTags($id));
         return $this->save($data, $id, $tags, $extraLifetime);
+*/
+    }
+
+    /**
+     * Give (if possible) an extra lifetime to the given cache id (and only that key, no tags are updated)
+     *
+     * @param string $id cache id
+     * @param int $extraLifetime
+     * @return boolean true if ok
+     */
+    protected function _touchKey($id, $extraLifetime)
+    {
+        if (!$this->_redis)
+            return false;
+
+        $data = $this->load($id, true);
+        if ($data === false)
+            return false;
+        return $this->storeKey($data, $id, $extraLifetime);
     }
 
     /**
