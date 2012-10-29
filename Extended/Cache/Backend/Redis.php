@@ -163,7 +163,22 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
                 $return = $this->_redis->setex($this->_keyFromId($id), $lifetime, $data);
             }
             $this->_redis->sAdd($this->_keyFromItemTags($id), '');
+            if ($lifetime !== null)
+                $this->_redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
+            else
+                $redis = $this->_redis->persist($this->_keyFromItemTags($id));
+
             return $return;
+        }
+
+        $tagsTTL = array();
+        foreach ($tags as $tag) {
+            if ($tag) {
+                if (!$this->_redis->exists($this->_keyFromTag($tag)))
+                    $tagsTTL[$tag] = false;
+                else
+                    $tagsTTL[$tag] = $this->_redis->ttl($this->_keyFromTag($tag));
+            }
         }
 
         $redis = $this->_redis->multi();
@@ -185,10 +200,24 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
 
         if ($lifetime !== null)
             $redis = $redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
+        else
+            $redis = $redis->persist($this->_keyFromItemTags($id));
 
         $return = $redis->exec();
         if (!count($return))
             return false;
+
+        foreach ($tags as $tag) {
+            if ($tag) {
+                $ttl = $tagsTTL[$tag];
+                if ($lifetime === null && $ttl !== false && $ttl != -1) {
+                    $this->_redis->persist($this->_keyFromTag($tag));
+                } else if ($lifetime !== null && ($ttl === false || ($ttl < $lifetime && $ttl != -1))) {
+                    $this->_redis->setTimeout($this->_keyFromTag($tag), $lifetime);
+                }
+            }
+        }
+
         foreach ($return as $value) {
             if ($value === false)
                 return false;
@@ -625,21 +654,31 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         if (!$this->_redis)
             return false;
 
+        $tags = $this->_redis->sMembers($this->_keyFromItemTags($id));
+
         $lifetime = $this->getLifetime($extraLifetime);
         $return = false;
         if ($lifetime !== null) {
             $this->_redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
             $return = $this->_redis->setTimeout($this->_keyFromId($id), $lifetime);
+        } else {
+            $this->_redis->persist($this->_keyFromItemTags($id));
+            $return = $this->_redis->persist($this->_keyFromId($id));
         }
-        return $return;
-/*
 
-        $data = $this->load($id);
-        if ($data === false)
-            return false;
-        $tags = $this->_redis->sMembers($this->_keyFromItemTags($id));
-        return $this->save($data, $id, $tags, $extraLifetime);
-*/
+        if ($tags) {
+            foreach ($tags as $tag) {
+                if ($tag) {
+                    $ttl = $this->_redis->ttl($this->_keyFromTag($tag));
+                    if ($ttl !== false && $ttl !== -1 && $ttl < $lifetime && $lifetime !== null)
+                        $this->_redis->setTimeout($this->_keyFromTag($tag), $lifetime);
+                    else if ($ttl !== false && $ttl !== -1 && $lifetime === null)
+                        $this->_redis->persist($this->_keyFromTag($tag));
+                }
+            }
+        }
+
+        return $return;
     }
 
     /**
