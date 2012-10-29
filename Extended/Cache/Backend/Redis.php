@@ -131,6 +131,27 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
     }
 
     /**
+     * Set the Redis connection in transaction mode. All coming Redis calls will be executed until transactionEnd() is called.
+     *
+     * @return bool true if transaction mode is enabled and the call is successful. false on error.
+     */
+    public function transactionBegin()
+    {
+        return $this->_redis->multi();
+    }
+
+    /**
+     * Execute the Redis transaction started with transactionBegin(). Also completes the transaction and puts the Redis connection
+     * back into normal mode.
+     *
+     * @return array result set of all executed commands in the transaction.
+     */
+    public function transactionEnd()
+    {
+        return $this->_redis->exec();
+    }
+
+    /**
      * Save some string datas into a cache record
      *
      * Note : $data is always "string" (serialization is done by the
