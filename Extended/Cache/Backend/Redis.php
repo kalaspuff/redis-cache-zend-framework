@@ -27,7 +27,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
     const DEFAULT_HOST = '127.0.0.1';
     const DEFAULT_PORT =  6379;
     const DEFAULT_PERSISTENT = true;
-    const DEFAULT_DBINDEX = 1;
+    const DEFAULT_DBINDEX = 0;
 
     protected $_options = array(
         'servers' => array(
