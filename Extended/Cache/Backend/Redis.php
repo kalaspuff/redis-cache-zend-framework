@@ -203,28 +203,56 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         }
 
         $redis = $this->_redis->multi();
-        $redis = $redis->delete($this->_keyFromItemTags($id));
+        $return = array();
+        if (!$redis)
+            $return[] = $this->_redis->delete($this->_keyFromItemTags($id));
+        else
+            $redis = $redis->delete($this->_keyFromItemTags($id));
+
         if ($lifetime === null) {
-            $redis = $redis->set($this->_keyFromId($id), $data);
+            if (!$redis)
+                $return[] = $this->_redis->set($this->_keyFromId($id), $data);
+            else
+                $redis = $redis->set($this->_keyFromId($id), $data);
         } else {
-            $redis = $redis->setex($this->_keyFromId($id), $lifetime, $data);
+            if (!$redis)
+                $return[] = $this->_redis->setex($this->_keyFromId($id), $lifetime, $data);
+            else
+                $redis = $redis->setex($this->_keyFromId($id), $lifetime, $data);
         }
 
         $itemTags = array($this->_keyFromItemTags($id));
         foreach ($tags as $tag) {
             $itemTags[] = $tag;
-            if ($tag)
-                $redis = $redis->sAdd($this->_keyFromTag($tag), $id);
+            if ($tag) {
+                if (!$redis)
+                    $return[] = $this->_redis->sAdd($this->_keyFromTag($tag), $id);
+                else
+                    $redis = $redis->sAdd($this->_keyFromTag($tag), $id);
+
+            }
         }
-        if (count($itemTags) > 1)
-            $redis = call_user_func_array(array($redis, 'sAdd'), $itemTags);
+        if (count($itemTags) > 1) {
+            if (!$redis)
+                $return[] = call_user_func_array(array($this->_redis, 'sAdd'), $itemTags);
+            else
+                $redis = call_user_func_array(array($redis, 'sAdd'), $itemTags);
+        }
 
-        if ($lifetime !== null)
-            $redis = $redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
-        else
-            $redis = $redis->persist($this->_keyFromItemTags($id));
+        if ($lifetime !== null) {
+            if (!$redis)
+                $return[] = $this->_redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
+            else
+                $redis = $redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
+        } else {
+            if (!$redis)
+                $return[] = $this->_redis->persist($this->_keyFromItemTags($id));
+            else
+                $redis = $redis->persist($this->_keyFromItemTags($id));
+        }
 
-        $return = $redis->exec();
+        if ($redis)
+            $return = $redis->exec();
         if (!count($return))
             return false;
 
