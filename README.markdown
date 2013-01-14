@@ -33,7 +33,7 @@ $data = 'e48e13207341b6bffb7fb1622282247b';
 $redisCache->save($data, $cacheKey, array('tag1', 'tag2'));
 
 /* Load data from cache */
-$data = $redisCache->save($cacheKey);
+$data = $redisCache->load($cacheKey);
 
 /* Clear all keys with tag 'tag1' */
 $redisCache->clean(Zend_Cache::CLEANING_MODE_MATCHING_ANY_TAG, array('tag1'));
