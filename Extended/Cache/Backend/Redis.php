@@ -396,7 +396,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
 
 
     /**
-     * Remove a cache tag record
+     * Remove a cache tag record, along with any associated item records
      *
      * @param  string $tag cache tag
      * @return boolean true if no problem
@@ -409,15 +409,17 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         if (!$tag)
             return false;
         if (is_string($tag))
-            $id = array($tag);
+            $tag = array($tag);
         if (!count($tag))
             return false;
-        $deleteTags = array();
+        $deleteKeys = array();
         foreach ($tag as $t) {
-            $deleteTags[] = $this->_keyFromTag($t);
+            $deleteKeys[] = $this->_keyFromTag($t);
+            foreach ($this->getIdsMatchingTags($t) as $id) {
+                $deleteKeys[] = $this->_keyFromId($id);
+            }
         }
-        if ($deleteTags && count($deleteTags))
-            $this->_redis->delete($deleteTags);
+        $this->_redis->delete($deleteKeys);
 
         return true;
     }
@@ -549,9 +551,6 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
     {
         if (!$this->_redis)
             return false;
-
-        $result = true;
-        $all = array();
 
         if ($mode == Zend_Cache::CLEANING_MODE_ALL)
             return $this->_redis->flushDb();
