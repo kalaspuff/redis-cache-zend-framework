@@ -394,11 +394,9 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         if (!$this->_redis)
             return false;
 
-        if (!$tag)
-            return false;
         if (is_string($tag))
-            $id = array($tag);
-        if (!count($tag))
+            $tag = array($tag);
+        if (empty($tag))
             return false;
         $deleteTags = array();
         foreach ($tag as $t) {
