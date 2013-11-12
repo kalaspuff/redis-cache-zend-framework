@@ -201,14 +201,16 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
             $tags = array($tags);
 
         $lifetime = $this->getLifetime($specificLifetime);
+        $keyFromItemTags = $this->_keyFromItemTags($id);
+        $keyFromId = $this->_keyFromId($id);
 
         // If no tags were provided, just set the value and return as quickly as possible
         if (empty($tags)) {
-            $this->_redis->delete($this->_keyFromItemTags($id)); // Wipe out any existing tags for this id
+            $this->_redis->delete($keyFromItemTags); // Wipe out any existing tags for this id
             if ($lifetime === null) {
-                $return = $this->_redis->set($this->_keyFromId($id), $data);
+                $return = $this->_redis->set($keyFromId, $data);
             } else {
-                $return = $this->_redis->setex($this->_keyFromId($id), $lifetime, $data);
+                $return = $this->_redis->setex($keyFromId, $lifetime, $data);
             }
             return $return;
         }
@@ -226,23 +228,23 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         $redis = $this->_redis->multi();
         $return = array();
         if (!$redis)
-            $return[] = $this->_redis->delete($this->_keyFromItemTags($id));
+            $return[] = $this->_redis->delete($keyFromItemTags);
         else
-            $redis = $redis->delete($this->_keyFromItemTags($id));
+            $redis = $redis->delete($keyFromItemTags);
 
         if ($lifetime === null) {
             if (!$redis)
-                $return[] = $this->_redis->set($this->_keyFromId($id), $data);
+                $return[] = $this->_redis->set($keyFromId, $data);
             else
-                $redis = $redis->set($this->_keyFromId($id), $data);
+                $redis = $redis->set($keyFromId, $data);
         } else {
             if (!$redis)
-                $return[] = $this->_redis->setex($this->_keyFromId($id), $lifetime, $data);
+                $return[] = $this->_redis->setex($keyFromId, $lifetime, $data);
             else
-                $redis = $redis->setex($this->_keyFromId($id), $lifetime, $data);
+                $redis = $redis->setex($keyFromId, $lifetime, $data);
         }
 
-        $itemTags = array($this->_keyFromItemTags($id));
+        $itemTags = array($keyFromItemTags);
         foreach ($tags as $tag) {
             $itemTags[] = $tag;
             if ($tag) {
@@ -262,14 +264,14 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
 
         if ($lifetime !== null) {
             if (!$redis)
-                $return[] = $this->_redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
+                $return[] = $this->_redis->setTimeout($keyFromItemTags, $lifetime);
             else
-                $redis = $redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
+                $redis = $redis->setTimeout($keyFromItemTags, $lifetime);
         } else {
             if (!$redis)
-                $return[] = $this->_redis->persist($this->_keyFromItemTags($id));
+                $return[] = $this->_redis->persist($keyFromItemTags);
             else
-                $redis = $redis->persist($this->_keyFromItemTags($id));
+                $redis = $redis->persist($keyFromItemTags);
         }
 
         if ($redis)
