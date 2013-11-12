@@ -536,9 +536,6 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         if (!$this->_redis)
             return false;
 
-        $result = true;
-        $all = array();
-
         if ($mode == Zend_Cache::CLEANING_MODE_ALL)
             return $this->_redis->flushDb();
 
