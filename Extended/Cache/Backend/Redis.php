@@ -202,26 +202,19 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         if (!$this->_redis)
             return false;
 
-        $lifetime = $this->getLifetime($specificLifetime);
-
-        if (!$tags || !count($tags))
-            $tags = array('');
         if (is_string($tags))
             $tags = array($tags);
 
-        if (!count($tags)) {
-            $this->_redis->delete($this->_keyFromItemTags($id));
+        $lifetime = $this->getLifetime($specificLifetime);
+
+        // If no tags were provided, just set the value and return as quickly as possible
+        if (empty($tags)) {
+            $this->_redis->delete($this->_keyFromItemTags($id)); // Wipe out any existing tags for this id
             if ($lifetime === null) {
                 $return = $this->_redis->set($this->_keyFromId($id), $data);
             } else {
                 $return = $this->_redis->setex($this->_keyFromId($id), $lifetime, $data);
             }
-            $this->_redis->sAdd($this->_keyFromItemTags($id), '');
-            if ($lifetime !== null)
-                $this->_redis->setTimeout($this->_keyFromItemTags($id), $lifetime);
-            else
-                $redis = $this->_redis->persist($this->_keyFromItemTags($id));
-
             return $return;
         }
 
