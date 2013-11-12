@@ -157,27 +157,6 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
     }
 
     /**
-     * Set the Redis connection in transaction mode. All coming Redis calls will be executed until transactionEnd() is called.
-     *
-     * @return bool true if transaction mode is enabled and the call is successful. false on error.
-     */
-    public function transactionBegin()
-    {
-        return $this->_redis->multi();
-    }
-
-    /**
-     * Execute the Redis transaction started with transactionBegin(). Also completes the transaction and puts the Redis connection
-     * back into normal mode.
-     *
-     * @return array result set of all executed commands in the transaction.
-     */
-    public function transactionEnd()
-    {
-        return $this->_redis->exec();
-    }
-
-    /**
      * Save some string datas into a cache record
      *
      * Note : $data is always "string" (serialization is done by the
@@ -229,19 +208,12 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         }
 
         // Enter "multi" mode
-        $redis = $this->_redis->multi();
-        $return = array();
+        $this->_redis->multi();
 
         if ($lifetime === null) {
-            if (!$redis)
-                $return[] = $this->_redis->set($keyFromId, $data);
-            else
-                $redis = $redis->set($keyFromId, $data);
+            $this->_redis->set($keyFromId, $data);
         } else {
-            if (!$redis)
-                $return[] = $this->_redis->setex($keyFromId, $lifetime, $data);
-            else
-                $redis = $redis->setex($keyFromId, $lifetime, $data);
+            $this->_redis->setex($keyFromId, $lifetime, $data);
         }
 
         $itemTags = array($keyFromItemTags);
@@ -255,62 +227,35 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
             $itemTags[] = $tag;
 
             // Add this id to the tag's list of entries
-            if (!$redis)
-                $return[] = $this->_redis->sAdd($keyFromTag, $id);
-            else
-                $redis = $redis->sAdd($keyFromTag, $id);
+            $this->_redis->sAdd($keyFromTag, $id);
 
             // For keys not already set to no expiration, make sure the TTL is correct
             $ttl = $tagTTLs[$tag];
             if ($ttl != -1) {
                 if ($lifetime === null && $ttl < 0) {
-                    if (!$redis)
-                        $return[] = $this->_redis->persist($keyFromTag);
-                    else
-                        $redis = $redis->persist($keyFromTag);
+                    $this->_redis->persist($keyFromTag);
                 } elseif ($lifetime !== null && $ttl < $lifetime) {
-                    if (!$redis)
-                        $return[] = $this->_redis->setTimeout($keyFromTag, $lifetime);
-                    else
-                        $redis = $redis->setTimeout($keyFromTag, $lifetime);
+                    $this->_redis->setTimeout($keyFromTag, $lifetime);
                 }
             }
 
         }
 
-        if (!$redis)
-            $return[] = $this->_redis->delete($keyFromItemTags);
-        else
-            $redis = $redis->delete($keyFromItemTags);
+        $this->_redis->delete($keyFromItemTags);
         if (count($itemTags) > 1) {
-            if (!$redis)
-                $return[] = call_user_func_array(array($this->_redis, 'sAdd'), $itemTags);
-            else
-                $redis = call_user_func_array(array($redis, 'sAdd'), $itemTags);
+            call_user_func_array(array($this->_redis, 'sAdd'), $itemTags);
         }
 
         if ($lifetime !== null) {
-            if (!$redis)
-                $return[] = $this->_redis->setTimeout($keyFromItemTags, $lifetime);
-            else
-                $redis = $redis->setTimeout($keyFromItemTags, $lifetime);
+            $this->_redis->setTimeout($keyFromItemTags, $lifetime);
         } else {
-            if (!$redis)
-                $return[] = $this->_redis->persist($keyFromItemTags);
-            else
-                $redis = $redis->persist($keyFromItemTags);
+            $this->_redis->persist($keyFromItemTags);
         }
 
-        if ($redis)
-            $return = $redis->exec();
-        if (!count($return))
-            return false;
+        $return = $this->_redis->exec();
 
-        foreach ($return as $value) {
-            if ($value === false)
-                return false;
-        }
-        return true;
+        // If return is empty or contains any individual failures, return false
+        return count($return) ? !in_array(false, $return) : false;
     }
 
     /**
