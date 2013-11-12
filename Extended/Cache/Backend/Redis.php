@@ -75,9 +75,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
     );
 
     /**
-     * Redis object
-     *
-     * @var mixed redis object
+     * @var Redis|null Redis object
      */
     protected $_redis = null;
 
@@ -215,22 +213,24 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
             return $return;
         }
 
-        $tagsTTL = array();
+        // Before we enter "multi" mode, grab a list of tag TTLs.
+        // Simulating behavior of redis 2.8 (-1 for no expiration, -2 for nonexistent key)
+        $tagTTLs = array();
         foreach ($tags as $tag) {
-            if ($tag) {
-                if (!$this->_redis->exists($this->_keyFromTag($tag)))
-                    $tagsTTL[$tag] = false;
-                else
-                    $tagsTTL[$tag] = $this->_redis->ttl($this->_keyFromTag($tag));
-            }
+            if (empty($tag))
+                continue;
+
+            $keyFromTag = $this->_keyFromTag($tag);
+
+            $ttl = $this->_redis->ttl($keyFromTag);
+            if ($ttl == -1 && !$this->_redis->exists($keyFromTag))
+                $ttl = -2;
+            $tagTTLs[$tag] = $ttl;
         }
 
+        // Enter "multi" mode
         $redis = $this->_redis->multi();
         $return = array();
-        if (!$redis)
-            $return[] = $this->_redis->delete($keyFromItemTags);
-        else
-            $redis = $redis->delete($keyFromItemTags);
 
         if ($lifetime === null) {
             if (!$redis)
@@ -246,15 +246,42 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
 
         $itemTags = array($keyFromItemTags);
         foreach ($tags as $tag) {
-            $itemTags[] = $tag;
-            if ($tag) {
-                if (!$redis)
-                    $return[] = $this->_redis->sAdd($this->_keyFromTag($tag), $id);
-                else
-                    $redis = $redis->sAdd($this->_keyFromTag($tag), $id);
+            if (empty($tag))
+                continue;
 
+            $keyFromTag = $this->_keyFromTag($tag);
+
+            // Keep track of the tags we will add to this item's list
+            $itemTags[] = $tag;
+
+            // Add this id to the tag's list of entries
+            if (!$redis)
+                $return[] = $this->_redis->sAdd($keyFromTag, $id);
+            else
+                $redis = $redis->sAdd($keyFromTag, $id);
+
+            // For keys not already set to no expiration, make sure the TTL is correct
+            $ttl = $tagTTLs[$tag];
+            if ($ttl != -1) {
+                if ($lifetime === null && $ttl < 0) {
+                    if (!$redis)
+                        $return[] = $this->_redis->persist($keyFromTag);
+                    else
+                        $redis = $redis->persist($keyFromTag);
+                } elseif ($lifetime !== null && $ttl < $lifetime) {
+                    if (!$redis)
+                        $return[] = $this->_redis->setTimeout($keyFromTag, $lifetime);
+                    else
+                        $redis = $redis->setTimeout($keyFromTag, $lifetime);
+                }
             }
+
         }
+
+        if (!$redis)
+            $return[] = $this->_redis->delete($keyFromItemTags);
+        else
+            $redis = $redis->delete($keyFromItemTags);
         if (count($itemTags) > 1) {
             if (!$redis)
                 $return[] = call_user_func_array(array($this->_redis, 'sAdd'), $itemTags);
@@ -278,17 +305,6 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
             $return = $redis->exec();
         if (!count($return))
             return false;
-
-        foreach ($tags as $tag) {
-            if ($tag) {
-                $ttl = $tagsTTL[$tag];
-                if ($lifetime === null && $ttl !== false && $ttl != -1) {
-                    $this->_redis->persist($this->_keyFromTag($tag));
-                } else if ($lifetime !== null && ($ttl === false || ($ttl < $lifetime && $ttl != -1))) {
-                    $this->_redis->setTimeout($this->_keyFromTag($tag), $lifetime);
-                }
-            }
-        }
 
         foreach ($return as $value) {
             if ($value === false)
