@@ -139,17 +139,12 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      * Test if a cache is available for the given id and (if yes) return it (false else)
      *
      * @param string $id cache id
-     * @param boolean $doNotTestCacheValidity if set to true, the cache validity won't be tested
+     * @param boolean $doNotTestCacheValidity Redis GET always acts as if $doNotTestCacheValidity is true.
      * @return string|false cached datas
      */
-    public function load($id, $doNotTestCacheValidity = false)
+    public function load($id, $doNotTestCacheValidity = true)
     {
-        if (!($this->_test($id, $doNotTestCacheValidity))) {
-            // The cache is not hit !
-            return false;
-        }
-        $data = $this->_load($id);
-        return $data;
+        return $this->_load($id);
     }
 
     /**
@@ -597,7 +592,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
      * Return cached id
      *
      * @param string $id cache id
-     * @return string cached datas
+     * @return string|bool cached data, or FALSE if cache has no value for $id
      */
     protected function _load($id)
     {
