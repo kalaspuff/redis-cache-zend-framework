@@ -255,7 +255,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         $return = $this->_redis->exec();
 
         // If return is empty or contains any individual failures, return false
-        return count($return) ? !in_array(false, $return) : false;
+        return count($return) ? !in_array(false, $return, /* strict */ true) : false;
     }
 
     /**
