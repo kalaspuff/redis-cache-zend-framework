@@ -360,6 +360,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
             $tag = array($tag);
         if (empty($tag))
             return false;
+
         $deleteTags = array();
         foreach ($tag as $t) {
             $deleteTags[] = $this->_keyFromTag($t);
@@ -504,14 +505,19 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
         if ($mode == Zend_Cache::CLEANING_MODE_OLD)
             return true; /* Redis takes care of expire */
 
-        if ($mode == Zend_Cache::CLEANING_MODE_MATCHING_ANY_TAG && $tags && (is_string($tags) || count($tags)))
-            return $this->removeTag($tags);
+        if ($mode == Zend_Cache::CLEANING_MODE_MATCHING_ANY_TAG && $tags && (is_string($tags) || count($tags))) {
+            if (is_string($tags))
+                $tags = [$tags];
+            $idsToRemove = [];
+            foreach ($tags as $tag) {
+                $idsToRemove = array_merge($idsToRemove, $this->getIdsMatchingTags($tag));
+            }
+            return $this->remove($idsToRemove);
+        }
 
-        if ($mode == Zend_Cache::CLEANING_MODE_MATCHING_TAG && $tags && (is_string($tags) || count($tags) == 1))
-            return $this->removeTag($tags);
-
-        if ($mode == Zend_Cache::CLEANING_MODE_MATCHING_TAG && $tags && count($tags))
+        if ($mode == Zend_Cache::CLEANING_MODE_MATCHING_TAG && $tags && (is_string($tags) || count($tags))) {
             return $this->remove($this->getIdsMatchingTags($tags));
+        }
 
         if ($mode == Zend_Cache::CLEANING_MODE_NOT_MATCHING_TAG)
             Zend_Cache::throwException('CLEANING_MODE_NOT_MATCHING_TAG not implemented for Redis cache');
