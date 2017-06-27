@@ -61,6 +61,8 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
     const DEFAULT_PORT =  6379;
     const DEFAULT_PERSISTENT = true;
     const DEFAULT_DBINDEX = 0;
+    const DEFAULT_AUTH = false;
+    const DEFAULT_AUTH_PASSWORD = null;
 
     protected $_options = array(
         'servers' => array(
@@ -72,6 +74,8 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
             ),
         ),
         'key_prefix' => '',
+        'auth' => self::DEFAULT_AUTH,
+        'password' => self::DEFAULT_AUTH_PASSWORD,
     );
 
     /**
@@ -117,6 +121,10 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
                 $this->_redis->select($server['dbindex']);
             else
                 $this->_redis = null;
+        }
+
+        if ($this->_redis && $this->_options['auth']) {
+            $this->_redis->auth($this->_options['password']);
         }
     }
 
