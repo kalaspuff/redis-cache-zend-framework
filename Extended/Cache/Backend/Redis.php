@@ -1,7 +1,7 @@
 <?php
 
 /**
-  * Copyright (c) 2011-2013, Carl Oscar Aaro
+  * Copyright (c) 2011-2017, Carl Oscar Aaro
   * All rights reserved.
   *
   * New BSD License
@@ -71,11 +71,11 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
                 'port' => self::DEFAULT_PORT,
                 'persistent' => self::DEFAULT_PERSISTENT,
                 'dbindex' => self::DEFAULT_DBINDEX,
+                'auth' => self::DEFAULT_AUTH,
+                'password' => self::DEFAULT_AUTH_PASSWORD,
             ),
         ),
         'key_prefix' => '',
-        'auth' => self::DEFAULT_AUTH,
-        'password' => self::DEFAULT_AUTH_PASSWORD,
     );
 
     /**
@@ -117,7 +117,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
                 $result = $this->_redis->connect($server['host'], $server['port']);
             }
 
-            if ($this->_redis && $server['auth']) {
+            if ($this->_redis && array_key_exists('auth', $server) && $server['auth']) {
                 $this->_redis->auth($server['password']);
             }
 
