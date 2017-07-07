@@ -17,8 +17,12 @@ $redisCache = Zend_Cache::factory(
                 'host' => '127.0.0.1',
                 'port' => 6379,
                 'dbindex' => 1,
+                // 'persistent' => false, // not a persistent connection
+                // 'auth' => true, // enable authentication
+                // 'password' => 'mypwd000000', // password to authenticate on redis server
             ),
         ),
+        // 'key_prefix' => 'my_app', // if desire to add a prefix to all cache keys
     ))
 );
 </pre>
