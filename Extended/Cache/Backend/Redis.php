@@ -63,6 +63,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
     const DEFAULT_DBINDEX = 0;
     const DEFAULT_AUTH = false;
     const DEFAULT_AUTH_PASSWORD = null;
+    const DEFAULT_TIMEOUT = 0.0;
 
     protected $_options = array(
         'servers' => array(
@@ -73,6 +74,7 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
                 'dbindex' => self::DEFAULT_DBINDEX,
                 'auth' => self::DEFAULT_AUTH,
                 'password' => self::DEFAULT_AUTH_PASSWORD,
+                'timeout' => self::DEFAULT_TIMEOUT,
             ),
         ),
         'key_prefix' => '',
@@ -111,10 +113,13 @@ class Extended_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Ca
             if (!array_key_exists('dbindex', $server)) {
                 $server['dbindex'] = self::DEFAULT_DBINDEX;
             }
+            if (!array_key_exists('timeout', $server)) {
+                $server['timeout'] = self::DEFAULT_TIMEOUT;
+            }
             if ($server['persistent']) {
-                $result = $this->_redis->pconnect($server['host'], $server['port']);
+                $result = $this->_redis->pconnect($server['host'], $server['port'], $server['timeout']);
             } else {
-                $result = $this->_redis->connect($server['host'], $server['port']);
+                $result = $this->_redis->connect($server['host'], $server['port'], $server['timeout']);
             }
 
             if ($this->_redis && array_key_exists('auth', $server) && $server['auth']) {
